@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Smartphone Controller Game</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        position: relative;
+        height: 100%;
+        background: #222222;
+      }
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .paper {
+        position: relative;
+        width: 400px;
+        height: 600px;
+        background: #e1e1e7;
+        margin: 0 100px;
+        flex-shrink: 0;
+      }
+      #mark_wrapper {
+        display: inline-block;
+        position: absolute;
+        background: #f1f1f5;
+        left: 50%;
+        transform: translate(-50%, 0) scale(1);
+        transform-origin: 50% 0;
+      }
+      .mark {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        background-size: contain;
+        font-size: 24px;
+        text-align: center;
+        line-height: 160px;
+        color: #fff;
+        font-weight: 800;
+      }
+      .mark::before {
+        /* content: ""; */
+        display: block;
+        position: absolute;
+        width: 80%;
+        height: 80%;
+        border-radius: 100%;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 255, 255, 0.15);
+      }
+      #playAMark {
+        background-image: url("./playerA.png");
+      }
+      #playBMark {
+        background-image: url("./playerB.png");
+      }
+      .circle {
+        position: absolute;
+        width: 100px;
+        height: 100px;
+        transform: translate(-50%, -50%);
+        background: red;
+        border-radius: 100px;
+        left: 50%;
+        top: 60%;
+        /* display: none; */
+      }
+
+      .hidden {
+        display: none !important;
+      }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+
+  <body>
+    <div id="playerA" class="paper">
+      <div id="mark_wrapper"><div class="mark" id="playAMark"></div></div>
+    </div>
+    <div id="playerB" class="paper">
+      <div id="mark_wrapper"><div class="mark" id="playBMark"></div></div>
+    </div>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/gsap/1.20.2/TweenLite.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/gsap/1.20.2/plugins/CSSPlugin.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/1.4.0/chroma.min.js"></script>
+    <script
+      src="https://code.jquery.com/jquery-3.3.1.min.js"
+      integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+      crossorigin="anonymous"
+    ></script>
+    <script type="text/javascript" charset="utf-8">
+      const mark = $("#playAMark");
+      const sample_paper = $("#playerA");
+      const width = sample_paper.innerWidth();
+      const height = sample_paper.innerHeight();
+      const circle_radius = 100 / 2;
+      const physicalW = 0.4;
+      const physicalH = 0.4;
+
+      let PLAYERS = {
+        A: {
+          words: [],
+          circles: [],
+          score: 0
+        },
+        B: {
+          words: [],
+          circles: [],
+          score: 0
+        }
+      };
+    </script>
+    <script>
+      function normalize(min, max, val) {
+        return (val - min) / (max - min);
+      }
+      function getPosX(pos) {
+        let ratio = width / mark.innerWidth();
+        let min = (-1 * physicalW * ratio) / 2;
+        let max = (1 * physicalW * ratio) / 2;
+        return normalize(min, max, Number(pos)) * width;
+      }
+      function getPosY(pos) {
+        let ratio = height / mark.innerWidth();
+        let min = (-1 * physicalH * ratio) / 2;
+        let max = (1 * physicalH * ratio) / 2;
+        return normalize(min, max, -Number(pos)) * height;
+      }
+      function setupGame(playDOMId, playerObj) {
+        let player = $(`#${playDOMId}`);
+        let circle_cnt = 5;
+        for (let i = 0; i < circle_cnt; i++) {
+          let new_circle = document.createElement("div");
+          new_circle.innerHTML = i;
+          new_circle.classList.add("circle");
+          new_circle.style.left = Math.random() * player.innerWidth() + "px";
+          new_circle.style.top = Math.random() * player.innerHeight() + "px";
+          new_circle.style.backgroundColor = chroma.random();
+          playerObj.circles.push(new_circle);
+          player.append(new_circle);
+        }
+      }
+    </script>
+    <!--
+      <script type="text/javascript">
+        let circle_cnt = 5;
+        let circles = [];
+        for (let i = 0; i < circle_cnt; i++) {
+          let new_circle = document.createElement("div");
+          new_circle.classList.add("circle");
+          new_circle.style.left = Math.random() * 400 + "px";
+          new_circle.style.top = Math.random() * 600 + "px";
+          new_circle.style.backgroundColor = chroma.random();
+          circles.push(new_circle);
+          paper.appendChild(new_circle);
+        }
+        console.log(circles);
+      </script>
+    -->
+    <script type="text/javascript" charset="utf-8">
+      var io = io.connect();
+      io.on("connect", function() {
+        setupGame("playerA", PLAYERS["A"]);
+        setupGame("playerB", PLAYERS["B"]);
+        handleGame(io);
+        console.log({
+          A: PLAYERS["A"].circles,
+          B: PLAYERS["B"].circles
+        });
+        io.emit("circles__web__server", {
+          A: PLAYERS["A"].circles.map(div => ({
+            left: parseInt(div.style.left, 10) / width - 0.5,
+            top: -parseInt(div.style.top, 10) / width + height / width / 2,
+            color: chroma(div.style.backgroundColor).num()
+          })),
+          B: PLAYERS["B"].circles.map(div => ({
+            left: parseInt(div.style.left, 10) / width - 0.5,
+            top: -parseInt(div.style.top, 10) / width + height / width / 2,
+            color: chroma(div.style.backgroundColor).num()
+          }))
+        });
+      });
+    </script>
+    <script>
+      function handleGame(io) {
+        io.on("down__server__web", function(data) {
+          let id_pos = data.split(" ");
+          let target_player = id_pos[0]; // String "A" or "B"
+          let pos = id_pos.slice(1); // "x" and "y"
+
+          // Find any element collide with pos
+          let reversed = PLAYERS[target_player].circles.slice().reverse();
+          let target_circle_idx = -1;
+          let pointedX = getPosX(pos[0]);
+          let pointedY = getPosY(pos[1]);
+
+          let circle_cnt = PLAYERS[target_player].circles.length;
+          for (let i = 0; i < circle_cnt; i++) {
+            let cX = parseInt(PLAYERS[target_player].circles[i].style.left, 10);
+            let cY = parseInt(PLAYERS[target_player].circles[i].style.top, 10);
+            // console.log(cX, cY);
+            if (
+              Math.sqrt((cX - pointedX) ** 2 + (cY - pointedY) ** 2) <
+              circle_radius
+            ) {
+              target_circle_idx = i;
+              break;
+            }
+          }
+
+          //detected
+          if (target_circle_idx != -1) {
+            PLAYERS[target_player].circles[target_circle_idx].classList.add(
+              "hidden"
+            );
+            io.emit("item_selected__web__server", [
+              target_player,
+              chroma(
+                PLAYERS[target_player].circles[target_circle_idx].style
+                  .backgroundColor
+              ).num()
+            ]);
+          }
+        });
+
+        io.on("up__server__web", function(data) {
+          let id_pos = data.split(" ");
+          let target_player = id_pos[0]; // String "A" or "B"
+          let pos = id_pos.slice(1); // "x" and "y"
+          let target_circle = PLAYERS[target_player].circles.filter(circle =>
+            circle.classList.contains("hidden")
+          );
+          if (target_circle.length > 0) {
+            target_circle = target_circle[0];
+          }
+          let pointedX = getPosX(pos[0]);
+          let pointedY = getPosY(pos[1]);
+          target_circle.style.left = pointedX + "px";
+          target_circle.style.top = pointedY + "px";
+          target_circle.classList.remove("hidden");
+        });
+      }
+    </script>
+  </body>
+</html>
