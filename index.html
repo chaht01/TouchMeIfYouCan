@@ -22,9 +22,10 @@
       .paper {
         position: relative;
         width: 400px;
-        height: 600px;
+        height: 440px;
         background: #e1e1e7;
         margin: 0 100px;
+        margin-top: 160px;
         flex-shrink: 0;
       }
       #mark_wrapper {
@@ -34,6 +35,7 @@
         left: 50%;
         transform: translate(-50%, 0) scale(1);
         transform-origin: 50% 0;
+        margin-top: -160px;
       }
       .mark {
         position: relative;
@@ -136,16 +138,16 @@
         let max = (1 * physicalH * ratio) / 2;
         return normalize(min, max, -Number(pos)) * height;
       }
-      function setupGame(playDOMId, playerObj) {
+      function setupGame(playDOMId, playerObj, data) {
         let player = $(`#${playDOMId}`);
         let circle_cnt = 5;
         for (let i = 0; i < circle_cnt; i++) {
           let new_circle = document.createElement("div");
           new_circle.innerHTML = i;
           new_circle.classList.add("circle");
-          new_circle.style.left = Math.random() * player.innerWidth() + "px";
-          new_circle.style.top = Math.random() * player.innerHeight() + "px";
-          new_circle.style.backgroundColor = chroma.random();
+          new_circle.style.left = getPosX(data[i].left) + "px";
+          new_circle.style.top = getPosY(data[i].top) + "px";
+          new_circle.style.backgroundColor = chroma(data[i].color).hex();
           playerObj.circles.push(new_circle);
           player.append(new_circle);
         }
@@ -153,34 +155,36 @@
     </script>
     <script type="text/javascript" charset="utf-8">
       var io = io.connect();
-      io.on("connect", function() {
-        setupGame("playerA", PLAYERS["A"]);
-        setupGame("playerB", PLAYERS["B"]);
+      io.on("connected", function(data) {
+        console.log(data);
+        setupGame("playerA", PLAYERS["A"], data.A);
+        setupGame("playerB", PLAYERS["B"], data.B);
         handleGame(io);
         console.log({
           A: PLAYERS["A"].circles,
           B: PLAYERS["B"].circles
         });
-        io.emit("circles__web__server", {
-          A: PLAYERS["A"].circles.map(div => ({
-            left: parseInt(div.style.left, 10) / width - 0.5,
-            top: -parseInt(div.style.top, 10) / width + height / width / 2,
-            color: chroma(div.style.backgroundColor).num()
-          })),
-          B: PLAYERS["B"].circles.map(div => ({
-            left: parseInt(div.style.left, 10) / width - 0.5,
-            top: -parseInt(div.style.top, 10) / width + height / width / 2,
-            color: chroma(div.style.backgroundColor).num()
-          }))
-        });
+        // io.emit("circles__web__server", {
+        //   A: PLAYERS["A"].circles.map(div => ({
+        //     left: parseInt(div.style.left, 10) / width - 0.5,
+        //     top: -parseInt(div.style.top, 10) / width + height / width / 2,
+        //     color: chroma(div.style.backgroundColor).num()
+        //   })),
+        //   B: PLAYERS["B"].circles.map(div => ({
+        //     left: parseInt(div.style.left, 10) / width - 0.5,
+        //     top: -parseInt(div.style.top, 10) / width + height / width / 2,
+        //     color: chroma(div.style.backgroundColor).num()
+        //   }))
+        // });
       });
     </script>
     <script>
       function handleGame(io) {
         io.on("down__server__web", function(data) {
+          console.log(data);
           let id_pos = data.split(" ");
           let target_player = id_pos[0]; // String "A" or "B"
-          let target_circle_idx = id_pos.slice(1); // "x" and "y"
+          let target_circle_idx = id_pos[1];
 
           // Find any element collide with pos
           let reversed = PLAYERS[target_player].circles.slice().reverse();
