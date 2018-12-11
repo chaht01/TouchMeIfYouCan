@@ -151,22 +151,6 @@
         }
       }
     </script>
-    <!--
-      <script type="text/javascript">
-        let circle_cnt = 5;
-        let circles = [];
-        for (let i = 0; i < circle_cnt; i++) {
-          let new_circle = document.createElement("div");
-          new_circle.classList.add("circle");
-          new_circle.style.left = Math.random() * 400 + "px";
-          new_circle.style.top = Math.random() * 600 + "px";
-          new_circle.style.backgroundColor = chroma.random();
-          circles.push(new_circle);
-          paper.appendChild(new_circle);
-        }
-        console.log(circles);
-      </script>
-    -->
     <script type="text/javascript" charset="utf-8">
       var io = io.connect();
       io.on("connect", function() {
@@ -196,58 +180,45 @@
         io.on("down__server__web", function(data) {
           let id_pos = data.split(" ");
           let target_player = id_pos[0]; // String "A" or "B"
-          let pos = id_pos.slice(1); // "x" and "y"
+          let target_circle_idx = id_pos.slice(1); // "x" and "y"
 
           // Find any element collide with pos
           let reversed = PLAYERS[target_player].circles.slice().reverse();
-          let target_circle_idx = -1;
-          let pointedX = getPosX(pos[0]);
-          let pointedY = getPosY(pos[1]);
-
-          let circle_cnt = PLAYERS[target_player].circles.length;
-          for (let i = 0; i < circle_cnt; i++) {
-            let cX = parseInt(PLAYERS[target_player].circles[i].style.left, 10);
-            let cY = parseInt(PLAYERS[target_player].circles[i].style.top, 10);
-            // console.log(cX, cY);
-            if (
-              Math.sqrt((cX - pointedX) ** 2 + (cY - pointedY) ** 2) <
-              circle_radius
-            ) {
-              target_circle_idx = i;
-              break;
-            }
-          }
 
           //detected
           if (target_circle_idx != -1) {
             PLAYERS[target_player].circles[target_circle_idx].classList.add(
               "hidden"
             );
-            io.emit("item_selected__web__server", [
-              target_player,
-              chroma(
-                PLAYERS[target_player].circles[target_circle_idx].style
-                  .backgroundColor
-              ).num()
-            ]);
           }
         });
 
         io.on("up__server__web", function(data) {
           let id_pos = data.split(" ");
           let target_player = id_pos[0]; // String "A" or "B"
-          let pos = id_pos.slice(1); // "x" and "y"
-          let target_circle = PLAYERS[target_player].circles.filter(circle =>
-            circle.classList.contains("hidden")
-          );
-          if (target_circle.length > 0) {
-            target_circle = target_circle[0];
+          let target_circle_idx = id_pos[1];
+          let pos = id_pos.slice(2); // "x" and "y"
+          if (target_circle_idx != -1) {
+            let target_circle =
+              PLAYERS[target_player].circles[target_circle_idx];
+            let pointedX = getPosX(pos[0]);
+            let pointedY = getPosY(pos[1]);
+            target_circle.style.left = pointedX + "px";
+            target_circle.style.top = pointedY + "px";
+            target_circle.classList.remove("hidden");
+            io.emit("circles__web__server", {
+              A: PLAYERS["A"].circles.map(div => ({
+                left: parseInt(div.style.left, 10) / width - 0.5,
+                top: -parseInt(div.style.top, 10) / width + height / width / 2,
+                color: chroma(div.style.backgroundColor).num()
+              })),
+              B: PLAYERS["B"].circles.map(div => ({
+                left: parseInt(div.style.left, 10) / width - 0.5,
+                top: -parseInt(div.style.top, 10) / width + height / width / 2,
+                color: chroma(div.style.backgroundColor).num()
+              }))
+            });
           }
-          let pointedX = getPosX(pos[0]);
-          let pointedY = getPosY(pos[1]);
-          target_circle.style.left = pointedX + "px";
-          target_circle.style.top = pointedY + "px";
-          target_circle.classList.remove("hidden");
         });
       }
     </script>
